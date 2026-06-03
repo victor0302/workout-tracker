@@ -1,0 +1,78 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtualenvs
+.venv/
+venv/
+env/
+ENV/
+
+# Testing / coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+
+# Type checkers / linters
+.mypy_cache/
+.ruff_cache/
+.pyre/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# --- Arduino / PlatformIO ---
+*.hex
+*.elf
+*.bin
+*.map
+*.o
+*.d
+.pio/
+.pioenvs/
+.piolibdeps/
+build/
+
+# Arduino IDE 2.x
+.theia/
+.vscode/arduino.json
+.vscode/c_cpp_properties.json
+
+# --- Editors / OS ---
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# --- Project ---
+*.log
+data/
+recordings/
+*.mp4
+*.avi
+.env
+.env.local
