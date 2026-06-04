@@ -19,6 +19,15 @@ from .rep_counter import RepCounter
 DASHBOARD_URL = "http://localhost:8000/ingest/vision"
 
 
+def build_vision_payload(exercise: str, reps: int, angle: float) -> dict:
+    """The exact payload shape this tracker sends to /ingest/vision.
+
+    Extracted so contract tests can verify the dashboard accepts what
+    vision sends without spinning up a real webcam.
+    """
+    return {"exercise": exercise, "reps": reps, "angle": angle}
+
+
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser()
     p.add_argument("--source", default="0", help="webcam index or path to video file")
@@ -75,7 +84,7 @@ def main() -> None:
                     try:
                         requests.post(
                             args.dashboard,
-                            json={"exercise": exercise, "reps": reps, "angle": angle},
+                            json=build_vision_payload(exercise, reps, angle),
                             timeout=0.5,
                         )
                     except requests.RequestException:
