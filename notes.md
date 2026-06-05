@@ -32,8 +32,9 @@ failures so you can develop without it).
 
 Scaffold is done; everything below is the actual work.
 
-- **Phase 0 — Smoke test.** Prove every pipe in the scaffold works
-  end-to-end with mock data before building anything real.
+- **Phase 0 — Smoke test. ✅ DONE 2026-06-04.** All five acceptance
+  criteria encoded as pytest tests under `tests/`. Tickets #1–#5
+  closed via PRs #15–#19.
 - **Phase 1 — Rep counting that works.** Squats only. Replace the
   threshold hack with a real counter: smoothing, hysteresis, depth
   gate, regression set.
@@ -66,9 +67,17 @@ Phases 1 and 2 are independent and can run in parallel.
 ## Current status
 
 - Scaffold committed and pushed to `victor0302/workout-tracker` (public).
-- Phase 0 and Phase 1 broken out as GitHub issues (`gh issue list`).
-- Phases 2–6 are not broken into tickets yet — do that when you get there.
-- Next action: start Phase 0 (1/5).
+- **Phase 0 complete.** Tickets #1–#5 closed via PRs #15–#19,
+  squash-merged to main on 2026-06-04. Acceptance criteria live as
+  pytest tests under `tests/`.
+- **Phase 1 in queue.** 9 tickets open (#6–#14). Start with the
+  record-and-replay harness (#6) before anything else — every later
+  Phase 1 ticket depends on it.
+- Phases 2–6 are not broken into tickets yet — do that when you get
+  there.
+- See `decisions.md` for design and process decisions (squash-merge
+  default, no Co-Authored-By, branch naming, etc.).
+- Next action: start Phase 1 (1/9) — record-and-replay harness.
 
 ## Open questions
 
