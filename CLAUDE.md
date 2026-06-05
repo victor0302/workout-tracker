@@ -8,7 +8,10 @@ Fitness tracking system that fuses computer vision (rep counting,
 exercise classification) with wearable biometrics (HR / SpO2 from an
 ESP32 + MAX30102), surfaced through a FastAPI dashboard.
 
-Read `notes.md` for the full plan, phases, decisions and open questions.
+Read `notes.md` for the full plan, phases and open questions. Read
+`decisions.md` for design and process decisions made along the way
+(squash-merge default, no `Co-Authored-By` in commits, branch naming,
+test-over-runbook policy).
 
 ## Repo layout
 
@@ -37,11 +40,18 @@ BLE UUIDs in `firmware/esp32_max30102/esp32_max30102.ino` and
   `dashboard/app.py`). Don't add direct imports across components.
 - Each component must run standalone — the dashboard is optional for
   developing vision or the BLE listener (both swallow connection errors).
+- Tests live under `tests/`, run with `pytest`. A state-reset fixture
+  in `tests/conftest.py` resets the dashboard's in-memory state between
+  tests, so order doesn't matter.
+- Branches: `phaseN/MM-slug` for ticket work, `docs/<slug>` for docs.
+- Merge PRs with `gh pr merge N --squash --delete-branch`.
+- **No `Co-Authored-By: Claude` trailer on commits or PRs.**
 
 ## Status
 
-Scaffold complete. Phase 0 and Phase 1 are tracked as GitHub issues
-(`gh issue list`). Phases 2–6 are described in `notes.md` but not yet
+Scaffold and **Phase 0 complete** (2026-06-04). Phase 1 (9 tickets,
+#6–#14) is the next phase to work — start with the record-and-replay
+harness (#6). Phases 2–6 are described in `notes.md` but not yet
 broken into tickets.
 
 ## When working on Phase 1
