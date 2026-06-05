@@ -53,8 +53,14 @@ Then `GET http://localhost:8000/metrics`.
 
 ### Vision tracker
 ```bash
-python -m vision.main --source 0           # webcam
-python -m vision.main --source path/to.mp4 # video file
+python -m vision.main --source 0                      # webcam
+python -m vision.main --source path/to.mp4            # video file
+python -m vision.main --source 0 --record clip.jsonl  # also dump keypoints to JSONL
+```
+
+### Replay a recorded clip
+```bash
+python -m vision.replay clip.jsonl   # headless; prints final rep count
 ```
 
 ### BLE listener

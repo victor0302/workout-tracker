@@ -7,13 +7,16 @@ totals to the dashboard.
 """
 
 import argparse
+import json
 import time
+from pathlib import Path
+from typing import IO
 
 import cv2
 import requests
 
 from .exercise_classifier import ExerciseClassifier
-from .pose_estimator import PoseEstimator, joint_angle
+from .pose_estimator import Keypoint, PoseEstimator, joint_angle
 from .rep_counter import RepCounter
 
 DASHBOARD_URL = "http://localhost:8000/ingest/vision"
@@ -28,11 +31,34 @@ def build_vision_payload(exercise: str, reps: int, angle: float) -> dict:
     return {"exercise": exercise, "reps": reps, "angle": angle}
 
 
+def build_record(ts: float, keypoints: dict[str, Keypoint] | None) -> dict:
+    """One JSONL line's contents for a recorded frame.
+
+    Format is the contract between `--record` here and `vision/replay.py`;
+    keep them in sync.
+    """
+    if keypoints is None:
+        return {"ts": ts, "keypoints": None}
+    return {
+        "ts": ts,
+        "keypoints": {
+            name: {"x": kp.x, "y": kp.y, "z": kp.z, "visibility": kp.visibility}
+            for name, kp in keypoints.items()
+        },
+    }
+
+
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser()
     p.add_argument("--source", default="0", help="webcam index or path to video file")
     p.add_argument("--dashboard", default=DASHBOARD_URL)
     p.add_argument("--no-display", action="store_true")
+    p.add_argument(
+        "--record",
+        type=Path,
+        default=None,
+        help="JSONL path to record keypoints to (off if omitted)",
+    )
     return p.parse_args()
 
 
@@ -51,6 +77,8 @@ def main() -> None:
     # Knee angle ranges for a squat-ish placeholder signal.
     counter = RepCounter(down_threshold=90.0, up_threshold=160.0)
 
+    record_file: IO[str] | None = args.record.open("w") if args.record else None
+
     last_post = 0.0
     try:
         while True:
@@ -59,6 +87,8 @@ def main() -> None:
                 break
 
             keypoints = pose.process(frame)
+            if record_file is not None:
+                record_file.write(json.dumps(build_record(time.time(), keypoints)) + "\n")
             if keypoints is not None:
                 hip = keypoints["RIGHT_HIP"]
                 knee = keypoints["RIGHT_KNEE"]
@@ -96,6 +126,8 @@ def main() -> None:
                 if cv2.waitKey(1) & 0xFF == ord("q"):
                     break
     finally:
+        if record_file is not None:
+            record_file.close()
         cap.release()
         cv2.destroyAllWindows()
         pose.close()
