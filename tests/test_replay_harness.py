@@ -91,3 +91,32 @@ def test_replay_missing_required_keypoint_is_skipped(tmp_path: Path):
     del record["keypoints"]["RIGHT_ANKLE"]
     _write_clip(clip, [record])
     assert replay(clip) == 0
+
+
+def test_replay_left_only_clip_counts_via_fallback(tmp_path: Path):
+    """Acceptance for #8: a clip where only one leg is present (here the
+    left side) still counts reps correctly via the visibility fallback."""
+    clip = tmp_path / "left_only.jsonl"
+    records = _angle_sweep(n_reps=3)
+    for r in records:
+        kp = r["keypoints"]
+        for joint in ("HIP", "KNEE", "ANKLE"):
+            kp[f"LEFT_{joint}"] = kp.pop(f"RIGHT_{joint}")
+    _write_clip(clip, records)
+    assert replay(clip) == 3
+
+
+def test_replay_both_legs_matches_one_leg(tmp_path: Path):
+    """Same angle on both legs averages to the same value as one leg alone."""
+    one_leg = tmp_path / "right.jsonl"
+    both_legs = tmp_path / "both.jsonl"
+    _write_clip(one_leg, _angle_sweep(n_reps=4))
+
+    both = _angle_sweep(n_reps=4)
+    for r in both:
+        kp = r["keypoints"]
+        for joint in ("HIP", "KNEE", "ANKLE"):
+            kp[f"LEFT_{joint}"] = dict(kp[f"RIGHT_{joint}"])
+    _write_clip(both_legs, both)
+
+    assert replay(one_leg) == replay(both_legs) == 4
