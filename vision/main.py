@@ -16,7 +16,8 @@ import cv2
 import requests
 
 from .exercise_classifier import ExerciseClassifier
-from .pose_estimator import Keypoint, PoseEstimator, joint_angle
+from .pose_estimator import PoseEstimator, joint_angle
+from .recording import build_record
 from .rep_counter import RepCounter
 
 DASHBOARD_URL = "http://localhost:8000/ingest/vision"
@@ -29,23 +30,6 @@ def build_vision_payload(exercise: str, reps: int, angle: float) -> dict:
     vision sends without spinning up a real webcam.
     """
     return {"exercise": exercise, "reps": reps, "angle": angle}
-
-
-def build_record(ts: float, keypoints: dict[str, Keypoint] | None) -> dict:
-    """One JSONL line's contents for a recorded frame.
-
-    Format is the contract between `--record` here and `vision/replay.py`;
-    keep them in sync.
-    """
-    if keypoints is None:
-        return {"ts": ts, "keypoints": None}
-    return {
-        "ts": ts,
-        "keypoints": {
-            name: {"x": kp.x, "y": kp.y, "z": kp.z, "visibility": kp.visibility}
-            for name, kp in keypoints.items()
-        },
-    }
 
 
 def parse_args() -> argparse.Namespace:

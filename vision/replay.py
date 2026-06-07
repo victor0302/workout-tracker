@@ -1,6 +1,6 @@
 """Replay a recorded keypoint stream through the rep counter, headless.
 
-JSONL format (one record per line, must match `vision.main.build_record`):
+JSONL format (one record per line, must match `vision.recording.build_record`):
 
     {"ts": float, "keypoints": null}
     {"ts": float, "keypoints": {"<NAME>": {"x": .., "y": .., "z": .., "visibility": ..}, ...}}
@@ -15,7 +15,8 @@ import json
 from collections.abc import Iterator
 from pathlib import Path
 
-from .pose_estimator import Keypoint, joint_angle
+from .pose_estimator import joint_angle
+from .recording import Keypoint
 from .rep_counter import RepCounter
 
 
