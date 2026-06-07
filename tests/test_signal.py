@@ -1,11 +1,12 @@
-"""Phase 1 (3/9): joint_angle + knee_angle (averaged with visibility fallback)."""
+"""Signal module tests — joint_angle, knee_angle, smoothers."""
 
 import math
+import random
 
 import pytest
 
 from vision.recording import Keypoint
-from vision.signal import joint_angle, knee_angle
+from vision.signal import EMASmoother, MedianSmoother, joint_angle, knee_angle
 
 
 def _kp(x: float, y: float, vis: float = 1.0) -> Keypoint:
@@ -81,3 +82,103 @@ class TestKneeAngle:
         kp = _leg(100.0, vis=0.4, side="LEFT")
         assert knee_angle(kp, vis_threshold=0.5) is None
         assert knee_angle(kp, vis_threshold=0.3) == pytest.approx(100.0)
+
+
+class TestEMASmoother:
+    def test_first_sample_seeds_state(self):
+        s = EMASmoother(alpha=0.3)
+        assert s.update(100.0) == 100.0
+
+    def test_converges_to_constant_input(self):
+        s = EMASmoother(alpha=0.3)
+        s.update(100.0)
+        for _ in range(50):
+            s.update(50.0)
+        assert s.update(50.0) == pytest.approx(50.0, abs=1e-3)
+
+    def test_alpha_one_is_passthrough(self):
+        s = EMASmoother(alpha=1.0)
+        for x in [10.0, 200.0, -5.0]:
+            assert s.update(x) == x
+
+    def test_alpha_must_be_in_open_unit_interval(self):
+        with pytest.raises(ValueError):
+            EMASmoother(alpha=0.0)
+        with pytest.raises(ValueError):
+            EMASmoother(alpha=1.5)
+
+    def test_none_returns_none_and_preserves_state(self):
+        s = EMASmoother(alpha=0.3)
+        s.update(100.0)
+        assert s.update(None) is None
+        # State preserved — next real sample blends with 100, not seeded fresh.
+        assert s.update(100.0) == pytest.approx(100.0)
+
+    def test_reset_clears_state(self):
+        s = EMASmoother(alpha=0.3)
+        s.update(100.0)
+        s.reset()
+        # Next sample seeds fresh, not blended against the old 100.
+        assert s.update(50.0) == 50.0
+
+    def test_reduces_variance_on_noisy_constant(self):
+        rng = random.Random(1)
+        noisy = [100.0 + rng.uniform(-10, 10) for _ in range(200)]
+        s = EMASmoother(alpha=0.3)
+        smoothed = [s.update(x) for x in noisy]
+        # Use the tail to skip the warm-up phase.
+        raw_var = _variance(noisy[100:])
+        smoothed_var = _variance(smoothed[100:])
+        assert smoothed_var < raw_var / 3
+
+
+class TestMedianSmoother:
+    def test_window_size_one_is_passthrough(self):
+        s = MedianSmoother(window=1)
+        for x in [10.0, 200.0, -5.0]:
+            assert s.update(x) == x
+
+    def test_returns_median_of_filled_window(self):
+        s = MedianSmoother(window=5)
+        for x in [1.0, 2.0, 3.0, 4.0, 5.0]:
+            s.update(x)
+        # window now [1, 2, 3, 4, 5], median = 3
+        assert s.update(6.0) == 4.0  # window [2, 3, 4, 5, 6]
+
+    def test_partial_window_returns_running_median(self):
+        s = MedianSmoother(window=5)
+        assert s.update(10.0) == 10.0
+        assert s.update(20.0) == 15.0  # median of [10, 20]
+        assert s.update(30.0) == 20.0  # median of [10, 20, 30]
+
+    def test_window_must_be_positive(self):
+        with pytest.raises(ValueError):
+            MedianSmoother(window=0)
+
+    def test_robust_to_single_outlier(self):
+        s = MedianSmoother(window=5)
+        for x in [100.0, 100.0, 100.0, 100.0]:
+            s.update(x)
+        # One huge outlier should not move the median much.
+        assert s.update(10000.0) == 100.0
+
+    def test_none_returns_none_and_preserves_state(self):
+        s = MedianSmoother(window=3)
+        s.update(10.0)
+        s.update(20.0)
+        assert s.update(None) is None
+        # Buffer still [10, 20] — next real sample joins the existing window.
+        assert s.update(30.0) == 20.0
+
+    def test_reset_clears_state(self):
+        s = MedianSmoother(window=3)
+        s.update(10.0)
+        s.update(20.0)
+        s.reset()
+        assert s.update(5.0) == 5.0
+
+
+def _variance(xs: list[float]) -> float:
+    n = len(xs)
+    mean = sum(xs) / n
+    return sum((x - mean) ** 2 for x in xs) / n

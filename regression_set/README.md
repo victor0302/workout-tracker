@@ -13,19 +13,27 @@ deterministic, dep-free, re-runnable. They cover the failure modes
 that Phase 1 (3/9) through (7/9) are meant to fix. Real human-recorded
 clips can be added later (same naming convention) to augment the set.
 
-| Clip | Expected | Naive counter today | Fixed by |
+| Clip | Expected | Counter (current) | Notes |
 |---|---:|---:|---|
-| `clean_5reps.jsonl` | 5 | 5 | — baseline |
-| `clean_8reps.jsonl` | 8 | 8 | — baseline |
-| `clean_10reps.jsonl` | 10 | 10 | — baseline |
-| `noisy_5reps.jsonl` | 5 | 5 | smoothing (#9) shouldn't break these |
-| `standing_0reps.jsonl` | 0 | 0 | — null hypothesis |
-| `partial_0reps.jsonl` | 0 | **3** | depth gate (#11) |
-| `jitter_0reps.jsonl` | 0 | **14** | hysteresis (#10) or min-duration (#12) |
+| `clean_5reps.jsonl` | 5 | 5 | baseline |
+| `clean_8reps.jsonl` | 8 | 8 | baseline |
+| `clean_10reps.jsonl` | 10 | 10 | baseline |
+| `noisy_5reps.jsonl` | 5 | 5 | smoother (#9) makes this robust |
+| `standing_0reps.jsonl` | 0 | 0 | null hypothesis |
+| `partial_0reps.jsonl` | 0 | **3** | depth gate (#11) will reject |
+| `jitter_0reps.jsonl` | 0 | 0 | smoother (#9) was enough; hysteresis (#10) + min-duration (#12) add belt-and-suspenders |
 
-Two clips intentionally fail today — that's the point. Each Phase 1
-ticket should drive the failing counts down toward the expected value
-without breaking the passing ones.
+One clip (`partial_0reps`) intentionally fails today — that's the
+point. Each remaining Phase 1 ticket should drive any failing counts
+toward the expected value without breaking the passing ones.
+
+### History
+- After #6/#7 (synthesis): `partial=3`, `jitter=14` both failed.
+- After #9 (smoothing, EMA α=0.3): `jitter` dropped to 0 as a side
+  effect — the smoothed signal never crosses the rep-counter
+  thresholds. `partial` unchanged.
+- After #11 (depth gate): `partial` expected to drop to 0, leaving
+  the whole set green.
 
 ## Synthesis details
 
