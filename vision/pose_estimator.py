@@ -1,17 +1,9 @@
 """Thin wrapper around MediaPipe Pose."""
 
-from dataclasses import dataclass
-
 import mediapipe as mp
 import numpy as np
 
-
-@dataclass
-class Keypoint:
-    x: float
-    y: float
-    z: float
-    visibility: float
+from .recording import Keypoint
 
 
 class PoseEstimator:

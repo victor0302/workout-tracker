@@ -4,8 +4,7 @@ import json
 import math
 from pathlib import Path
 
-from vision.main import build_record
-from vision.pose_estimator import Keypoint
+from vision.recording import Keypoint, build_record
 from vision.replay import iter_jsonl, replay
 
 
