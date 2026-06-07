@@ -17,12 +17,17 @@ from pathlib import Path
 
 from .recording import Keypoint
 from .rep_counter import RepCounter
-from .signal import knee_angle
+from .signal import EMASmoother, Smoother, knee_angle
 
 
 def _default_counter() -> RepCounter:
     # Same thresholds main.py uses today; later Phase 1 tickets will tune these.
     return RepCounter(down_threshold=90.0, up_threshold=160.0)
+
+
+def _default_smoother() -> Smoother:
+    # Same smoother main.py uses; override for raw-signal tests.
+    return EMASmoother(alpha=0.3)
 
 
 def iter_jsonl(path: Path) -> Iterator[dict]:
@@ -39,14 +44,24 @@ def _kp_from_dict(raw: dict | None) -> dict[str, Keypoint] | None:
     return {name: Keypoint(**vals) for name, vals in raw.items()}
 
 
-def replay(path: Path, counter: RepCounter | None = None) -> int:
-    """Replay a JSONL clip through the rep counter; return total rep count."""
+def replay(
+    path: Path,
+    counter: RepCounter | None = None,
+    smoother: Smoother | None = None,
+) -> int:
+    """Replay a JSONL clip through the rep counter; return total rep count.
+
+    The default smoother (EMA alpha=0.3) matches `vision.main`. Pass a
+    different Smoother (or your own RepCounter) to A/B against the
+    regression set.
+    """
     counter = counter or _default_counter()
+    smoother = smoother if smoother is not None else _default_smoother()
     for record in iter_jsonl(path):
         kp = _kp_from_dict(record.get("keypoints"))
         if kp is None:
             continue
-        angle = knee_angle(kp)
+        angle = smoother.update(knee_angle(kp))
         if angle is None:
             continue
         counter.update(angle)

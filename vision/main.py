@@ -18,7 +18,7 @@ from .exercise_classifier import ExerciseClassifier
 from .pose_estimator import PoseEstimator
 from .recording import build_record
 from .rep_counter import RepCounter
-from .signal import knee_angle
+from .signal import EMASmoother, knee_angle
 
 DASHBOARD_URL = "http://localhost:8000/ingest/vision"
 
@@ -60,6 +60,7 @@ def main() -> None:
     classifier = ExerciseClassifier()
     # Knee angle ranges for a squat-ish placeholder signal.
     counter = RepCounter(down_threshold=90.0, up_threshold=160.0)
+    smoother = EMASmoother(alpha=0.3)
 
     record_file: IO[str] | None = args.record.open("w") if args.record else None
 
@@ -74,7 +75,8 @@ def main() -> None:
             if record_file is not None:
                 record_file.write(json.dumps(build_record(time.time(), keypoints)) + "\n")
 
-            angle = knee_angle(keypoints) if keypoints is not None else None
+            raw = knee_angle(keypoints) if keypoints is not None else None
+            angle = smoother.update(raw)
             if angle is not None:
                 reps = counter.update(angle)
                 exercise = classifier.update(keypoints)
