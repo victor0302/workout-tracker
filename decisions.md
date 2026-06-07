@@ -3,6 +3,46 @@
 Running log of design and process decisions that aren't obvious from
 code or git history. Newest at the top.
 
+## 2026-06-07 — `vision/signal.py` houses all rep-counter signal processing
+
+`joint_angle`, `knee_angle`, and (going forward) smoothing,
+hysteresis, depth-gate logic etc. all live in `vision/signal.py`.
+`vision/pose_estimator.py` is now strictly a MediaPipe wrapper —
+inference only, no analysis. `vision/rep_counter.py` is a state
+machine that consumes a numeric signal; it doesn't know where the
+signal came from.
+
+**Why.** Three concerns separated cleanly:
+1. inference (`pose_estimator`, needs mediapipe + numpy + cv2),
+2. signal extraction and filtering (`signal`, dep-free Python),
+3. state machine (`rep_counter`, dep-free dataclass).
+
+Tests and tooling can import `signal` without dragging the inference
+stack. Future Phase 1 work (`#9–#12`) extends `signal.py` without
+touching `main.py` or `rep_counter.py`.
+
+**Carry forward.** Smoothing (`#9`), hysteresis (`#10`), depth gate
+(`#11`), min-duration filter (`#12`) all land in `vision/signal.py`.
+Do not put signal-processing back into `pose_estimator.py`,
+`rep_counter.py`, or `main.py`. The rep counter stays a pure state
+machine.
+
+## 2026-06-07 — Skip-on-`None` contract for the signal pipeline
+
+When `knee_angle` can't produce a value (low visibility, missing
+landmarks), it returns `None` and the caller skips the frame — no
+interpolation, no last-known-value substitution, no rep counter
+update.
+
+**Why.** Interpolating across missing frames would fabricate signal
+the counter then acts on. Better to drop the frame and let real
+samples drive the state machine.
+
+**Carry forward.** Smoothing and hysteresis additions in `signal.py`
+must propagate `None` cleanly: a smoother fed `None` should also emit
+`None` (or skip the sample from its window), never substitute. Same
+for any future filter.
+
 ## 2026-06-06 — Regression-clip filenames encode expected rep count
 
 Clips in `regression_set/` are named `<label>_<n>reps.jsonl`. The `#14`

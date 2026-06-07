@@ -15,15 +15,24 @@ test-over-runbook policy).
 
 ## Repo layout
 
-- `vision/` — MediaPipe pose estimator, rep counter (state machine on a
-  joint-angle signal), exercise classifier (currently a stub), JSONL
-  record/replay harness. Entry points:
-  - `python -m vision.main --source 0` — live capture
-  - `python -m vision.main --source 0 --record clip.jsonl` — capture + record
-  - `python -m vision.replay clip.jsonl` — headless replay
-  - `vision/recording.py` — dep-free `Keypoint` + `build_record`; the
-    canonical source for the JSONL format. Import from here in tests
-    and scripts to avoid pulling cv2 / mediapipe / numpy.
+- `vision/` — three clearly-separated concerns:
+  - **Inference** — `pose_estimator.py` (MediaPipe wrapper, needs
+    `cv2` + `mediapipe` + `numpy`).
+  - **Signal extraction & filtering** — `signal.py` (dep-free Python:
+    `joint_angle`, `knee_angle`, plus smoothing/hysteresis/depth-gate
+    as Phase 1 lands them).
+  - **State machine** — `rep_counter.py` (dep-free dataclass; consumes
+    a numeric signal, doesn't know where it came from).
+  - Also: `recording.py` (dep-free `Keypoint` + `build_record` for the
+    JSONL format), `main.py` (capture loop), `replay.py` (headless
+    replay), `exercise_classifier.py` (stub).
+  - Entry points:
+    - `python -m vision.main --source 0` — live capture
+    - `python -m vision.main --source 0 --record clip.jsonl` — capture + record
+    - `python -m vision.replay clip.jsonl` — headless replay
+  - **Import rule:** tests and scripts should import from `signal` or
+    `recording` (both dep-free), not from `pose_estimator` or `main`,
+    to avoid pulling cv2 / mediapipe / numpy.
 - `firmware/esp32_max30102/` — Arduino sketch. Reads MAX30102 over I2C,
   broadcasts a JSON payload via a single BLE notify characteristic. HR
   works; SpO2 algorithm is stubbed.
@@ -64,11 +73,13 @@ BLE UUIDs in `firmware/esp32_max30102/esp32_max30102.ino` and
 ## Status
 
 - Scaffold and **Phase 0 complete** (2026-06-04).
-- **Phase 1 in flight** — 2/9 merged 2026-06-06:
+- **Phase 1 in flight** — 3/9 merged (latest 2026-06-07):
   - `#6` (PR #21) — record-and-replay harness
   - `#7` (PR #22) — synthetic regression set
-- Next ticket: `#8` (averaged left+right knee angle). Then `#9`–`#14`
-  in order.
+  - `#8` (PR #24) — averaged knee angle in `vision/signal.py`
+- Next ticket: `#9` (smoothing). Then `#10` hysteresis → `#11` depth
+  gate → `#12` min-duration → `#13` debug overlay → `#14` regression
+  test.
 - Phases 2–6 are described in `notes.md` but not yet broken into
   tickets.
 
@@ -77,14 +88,21 @@ BLE UUIDs in `firmware/esp32_max30102/esp32_max30102.ino` and
 The foundation is now on main:
 - `vision/replay.py` runs a JSONL clip through the rep counter headless
 - `regression_set/*.jsonl` is the labeled test set
+- `vision/signal.py` is where all signal-processing lives
 
-The remaining Phase 1 work (`#8`–`#14`) tunes the rep counter against
-that set. **Don't tune thresholds in isolation.** Every change to
-`vision/rep_counter.py` or the signal pipeline in `vision/main.py`
-should be validated by replaying the regression set. If you find
-yourself adjusting threshold constants without checking
+The remaining Phase 1 work (`#9`–`#14`) tunes the signal pipeline
+against the regression set. **Don't tune thresholds in isolation.**
+Every change to `vision/signal.py` or `vision/rep_counter.py` should
+be validated by replaying the regression set. If you find yourself
+adjusting threshold constants without checking
 `python -m vision.replay regression_set/*.jsonl` outputs, stop. The
 regression test in `#14` will formalize this.
+
+Smoothing (`#9`), hysteresis (`#10`), depth gate (`#11`), and
+min-duration (`#12`) all live in `vision/signal.py` — not in
+`rep_counter.py` (state machine stays pure) and not in `main.py` (just
+glue). Any new filter must propagate `None` through cleanly: never
+interpolate across missing frames or substitute last-known values.
 
 Synthetic clips today expose every Phase 1 failure mode the tickets
 address. `partial_0reps.jsonl` and `jitter_0reps.jsonl` intentionally
