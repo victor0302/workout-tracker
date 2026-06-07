@@ -1,9 +1,8 @@
 """Vision tracker entrypoint.
 
 Captures frames from a webcam or file, runs MediaPipe pose, drives the
-rep counter off the right-knee angle (placeholder signal for "squat"),
-asks the classifier what exercise is happening, and POSTs running
-totals to the dashboard.
+rep counter off the averaged knee angle, asks the classifier what
+exercise is happening, and POSTs running totals to the dashboard.
 """
 
 import argparse
@@ -16,9 +15,10 @@ import cv2
 import requests
 
 from .exercise_classifier import ExerciseClassifier
-from .pose_estimator import PoseEstimator, joint_angle
+from .pose_estimator import PoseEstimator
 from .recording import build_record
 from .rep_counter import RepCounter
+from .signal import knee_angle
 
 DASHBOARD_URL = "http://localhost:8000/ingest/vision"
 
@@ -73,12 +73,9 @@ def main() -> None:
             keypoints = pose.process(frame)
             if record_file is not None:
                 record_file.write(json.dumps(build_record(time.time(), keypoints)) + "\n")
-            if keypoints is not None:
-                hip = keypoints["RIGHT_HIP"]
-                knee = keypoints["RIGHT_KNEE"]
-                ankle = keypoints["RIGHT_ANKLE"]
-                angle = joint_angle(hip, knee, ankle)
 
+            angle = knee_angle(keypoints) if keypoints is not None else None
+            if angle is not None:
                 reps = counter.update(angle)
                 exercise = classifier.update(keypoints)
 

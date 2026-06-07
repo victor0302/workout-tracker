@@ -15,9 +15,9 @@ import json
 from collections.abc import Iterator
 from pathlib import Path
 
-from .pose_estimator import joint_angle
 from .recording import Keypoint
 from .rep_counter import RepCounter
+from .signal import knee_angle
 
 
 def _default_counter() -> RepCounter:
@@ -46,10 +46,9 @@ def replay(path: Path, counter: RepCounter | None = None) -> int:
         kp = _kp_from_dict(record.get("keypoints"))
         if kp is None:
             continue
-        hip, knee, ankle = kp.get("RIGHT_HIP"), kp.get("RIGHT_KNEE"), kp.get("RIGHT_ANKLE")
-        if not (hip and knee and ankle):
+        angle = knee_angle(kp)
+        if angle is None:
             continue
-        angle = joint_angle(hip, knee, ankle)
         counter.update(angle)
     return counter.count
 
