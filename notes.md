@@ -37,7 +37,7 @@ Scaffold is done; everything below is the actual work.
   closed via PRs #15–#19.
 - **Phase 1 — Rep counting that works.** Squats only. Replace the
   threshold hack with a real counter: smoothing, hysteresis, depth
-  gate, regression set. **In progress — 3/9 merged (latest 2026-06-07).**
+  gate, regression set. **In progress — 4/9 merged (latest 2026-06-07).**
 - **Phase 2 — Wearable: real HR flowing.** Flash the ESP32, validate
   MAX30102 readings against a reference, fill in the SpO2 algorithm
   that's stubbed in the sketch.
@@ -70,32 +70,39 @@ Phases 1 and 2 are independent and can run in parallel.
 - **Phase 0 complete.** Tickets #1–#5 closed via PRs #15–#19,
   squash-merged to main on 2026-06-04. Acceptance criteria live as
   pytest tests under `tests/`.
-- **Phase 1 in flight (3/9).** Merged so far:
+- **Phase 1 in flight (4/9).** Merged so far:
   - `#6` — record-and-replay harness (PR #21, 2026-06-06).
     `vision/replay.py` runs a JSONL clip through the rep counter
     headless.
   - `#7` — synthetic regression set (PR #22, 2026-06-06).
     `regression_set/` holds 7 labeled synthetic clips covering every
-    Phase 1 failure mode. `partial_0reps.jsonl` and `jitter_0reps.jsonl`
-    intentionally fail the naive counter today — that's the point.
+    Phase 1 failure mode.
   - `#8` — averaged knee angle (PR #24, 2026-06-07). New
-    `vision/signal.py` is now the home for all rep-counter signal
-    processing. `knee_angle()` averages both legs when visible, falls
-    back to one side, returns `None` when neither leg meets the
-    visibility threshold (frame skipped).
-  - 6 tickets remaining: `#9` smoothing → `#10` hysteresis →
-    `#11` depth gate → `#12` min-duration → `#13` debug overlay →
-    `#14` regression test. `#9–#12` all live in `vision/signal.py`
-    going forward.
+    `vision/signal.py` houses signal extraction. `knee_angle()`
+    averages both legs when visible, falls back to one side, returns
+    `None` when neither leg meets the visibility threshold.
+  - `#9` — EMA + median smoothing (PR #26, 2026-06-07). `Smoother`
+    Protocol in `signal.py`; `EMASmoother(alpha=0.3)` is the default
+    wired into `main.py` and `replay.py`. Side effect: smoothing
+    alone dropped `jitter_0reps` from 14 → 0. Only `partial_0reps`
+    still fails the counter (3 vs expected 0).
+  - 5 tickets remaining: `#10` hysteresis → `#11` depth gate →
+    `#12` min-duration → `#13` debug overlay → `#14` regression test.
+    **Architecture split:** `#10/#11/#12` extend `RepCounter` (they
+    change *when* state transitions happen); they do **not** belong
+    in `signal.py`. Earlier docs claimed otherwise — corrected here
+    and in `decisions.md`.
 - Phases 2–6 are not broken into tickets yet — do that when you get
   there.
 - See `decisions.md` for design and process decisions (squash-merge
   default, no Co-Authored-By, branch naming, synthetic-first
   regression data, dep-free format module, signal-vs-pose separation,
   skip-on-None contract, etc.).
-- Next action: start Phase 1 (4/9) — smoothing (`#9`). Lives in
-  `vision/signal.py`; must keep `noisy_5reps.jsonl` at 5 reps and not
-  regress the clean clips.
+- Next action: start Phase 1 (5/9) — hysteresis (`#10`). Extends
+  `RepCounter` (state machine), not `signal.py`. Add a "candidate"
+  state and require N consecutive frames past the threshold before
+  committing the transition. Must keep all currently-passing
+  regression clips passing.
 
 ## Open questions
 

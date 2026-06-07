@@ -3,29 +3,58 @@
 Running log of design and process decisions that aren't obvious from
 code or git history. Newest at the top.
 
-## 2026-06-07 — `vision/signal.py` houses all rep-counter signal processing
+## 2026-06-07 — Three-way split: inference / signal / state machine
 
-`joint_angle`, `knee_angle`, and (going forward) smoothing,
-hysteresis, depth-gate logic etc. all live in `vision/signal.py`.
-`vision/pose_estimator.py` is now strictly a MediaPipe wrapper —
-inference only, no analysis. `vision/rep_counter.py` is a state
-machine that consumes a numeric signal; it doesn't know where the
-signal came from.
+`vision/pose_estimator.py` is strictly a MediaPipe wrapper — inference
+only, no analysis. `vision/signal.py` does per-sample signal
+extraction and filtering (`joint_angle`, `knee_angle`, smoothers).
+`vision/rep_counter.py` is a state machine over a stream of numeric
+samples; it doesn't know where the signal came from.
 
 **Why.** Three concerns separated cleanly:
 1. inference (`pose_estimator`, needs mediapipe + numpy + cv2),
 2. signal extraction and filtering (`signal`, dep-free Python),
-3. state machine (`rep_counter`, dep-free dataclass).
+3. state machine over samples (`rep_counter`, dep-free dataclass).
 
 Tests and tooling can import `signal` without dragging the inference
-stack. Future Phase 1 work (`#9–#12`) extends `signal.py` without
-touching `main.py` or `rep_counter.py`.
+stack.
 
-**Carry forward.** Smoothing (`#9`), hysteresis (`#10`), depth gate
-(`#11`), min-duration filter (`#12`) all land in `vision/signal.py`.
-Do not put signal-processing back into `pose_estimator.py`,
-`rep_counter.py`, or `main.py`. The rep counter stays a pure state
-machine.
+**Where the remaining Phase 1 tickets land:**
+- `#9` smoothing → `signal.py` (per-sample transformation). ✅ Done.
+- `#10` hysteresis → `rep_counter.py` (when to commit a state
+  transition is state-machine behavior).
+- `#11` depth gate → `rep_counter.py` (track min angle in down phase;
+  gate at up transition).
+- `#12` min-duration → `rep_counter.py` (timestamps on transitions).
+- `#13` debug overlay → `main.py` (UX).
+- `#14` regression test → `tests/`.
+
+Rule of thumb: if it transforms a sample, it's `signal.py`. If it
+changes *when the rep counter transitions* given a stream of samples,
+it's `rep_counter.py`. (An earlier version of this entry incorrectly
+lumped `#10–#12` into `signal.py` — fixed 2026-06-07.)
+
+## 2026-06-07 — `Smoother` Protocol for filters in `signal.py`
+
+Per-sample filters in `signal.py` implement a small Protocol:
+
+    class Smoother(Protocol):
+        def update(self, x: float | None) -> float | None: ...
+        def reset(self) -> None: ...
+
+Two implementations today: `EMASmoother(alpha=0.3)` and
+`MedianSmoother(window=5)`. `vision.main` and `vision.replay` both
+take a `Smoother` and pipe `knee_angle(...)` through it.
+
+**Why.** Makes filters interchangeable from the call site, encodes
+the skip-on-`None` contract in the type signature, and lets future
+filters slot in (Kalman, Savitzky–Golay, whatever) without rewiring
+callers.
+
+**Carry forward.** Any new per-sample filter in `signal.py` implements
+`Smoother`. `update(None)` returns `None` without mutating state.
+Expose `reset()` for tests and for cases where the caller knows the
+signal has discontinuously restarted (e.g. new session).
 
 ## 2026-06-07 — Skip-on-`None` contract for the signal pipeline
 

@@ -73,13 +73,17 @@ BLE UUIDs in `firmware/esp32_max30102/esp32_max30102.ino` and
 ## Status
 
 - Scaffold and **Phase 0 complete** (2026-06-04).
-- **Phase 1 in flight** — 3/9 merged (latest 2026-06-07):
+- **Phase 1 in flight** — 4/9 merged (latest 2026-06-07):
   - `#6` (PR #21) — record-and-replay harness
   - `#7` (PR #22) — synthetic regression set
   - `#8` (PR #24) — averaged knee angle in `vision/signal.py`
-- Next ticket: `#9` (smoothing). Then `#10` hysteresis → `#11` depth
-  gate → `#12` min-duration → `#13` debug overlay → `#14` regression
-  test.
+  - `#9` (PR #26) — EMA + median smoothing (`Smoother` Protocol);
+    side effect: `jitter_0reps` dropped 14 → 0
+- Next ticket: `#10` (hysteresis, extends `RepCounter`). Then `#11`
+  depth gate → `#12` min-duration → `#13` debug overlay → `#14`
+  regression test.
+- Only `partial_0reps` still fails the counter (3 vs expected 0).
+  `#11` will close that.
 - Phases 2–6 are described in `notes.md` but not yet broken into
   tickets.
 
@@ -88,22 +92,34 @@ BLE UUIDs in `firmware/esp32_max30102/esp32_max30102.ino` and
 The foundation is now on main:
 - `vision/replay.py` runs a JSONL clip through the rep counter headless
 - `regression_set/*.jsonl` is the labeled test set
-- `vision/signal.py` is where all signal-processing lives
+- `vision/signal.py` handles per-sample signal extraction + filtering
+  (`knee_angle`, `EMASmoother`, `MedianSmoother`)
+- `vision/rep_counter.py` handles state-machine behavior over a stream
+  of samples
 
-The remaining Phase 1 work (`#9`–`#14`) tunes the signal pipeline
-against the regression set. **Don't tune thresholds in isolation.**
-Every change to `vision/signal.py` or `vision/rep_counter.py` should
-be validated by replaying the regression set. If you find yourself
-adjusting threshold constants without checking
+The remaining work (`#10`–`#14`) tunes the rep counter against the
+regression set. **Don't tune thresholds in isolation.** Every change
+to `vision/signal.py` or `vision/rep_counter.py` should be validated
+by replaying the regression set. If you find yourself adjusting
+threshold constants without checking
 `python -m vision.replay regression_set/*.jsonl` outputs, stop. The
 regression test in `#14` will formalize this.
 
-Smoothing (`#9`), hysteresis (`#10`), depth gate (`#11`), and
-min-duration (`#12`) all live in `vision/signal.py` — not in
-`rep_counter.py` (state machine stays pure) and not in `main.py` (just
-glue). Any new filter must propagate `None` through cleanly: never
-interpolate across missing frames or substitute last-known values.
+**Where each remaining ticket lives:**
+- `#10` hysteresis, `#11` depth gate, `#12` min-duration → extend
+  `RepCounter`. They change *when* the counter transitions given a
+  stream of samples — that's state-machine behavior, not signal
+  transformation.
+- `#13` debug overlay → `main.py` (UX only).
+- `#14` regression test → `tests/`.
 
-Synthetic clips today expose every Phase 1 failure mode the tickets
-address. `partial_0reps.jsonl` and `jitter_0reps.jsonl` intentionally
-fail the naive counter — driving them to 0 is the work.
+Per-sample filters (the kind `signal.py` houses) implement the
+`Smoother` Protocol: `update(x: float | None) -> float | None` plus
+`reset()`. `update(None)` returns `None` without mutating state — no
+interpolation, no last-known-value substitution. Any new filter must
+follow this contract.
+
+Synthetic clips today exercise every Phase 1 failure mode. After `#9`
+only `partial_0reps` still fails; `#11` (depth gate) is what closes
+it. `#10` and `#12` are belt-and-suspenders against jitter patterns
+the synthetic set doesn't cover specifically.
