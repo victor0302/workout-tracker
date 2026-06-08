@@ -32,6 +32,11 @@ toward the expected value without breaking the passing ones.
 - After #9 (smoothing, EMA α=0.3): `jitter` dropped to 0 as a side
   effect — the smoothed signal never crosses the rep-counter
   thresholds. `partial` unchanged.
+- After #10 (hysteresis, dwell=5): counts unchanged. Required a
+  generator change — each clip now has a 15-frame (~0.5s) trailing
+  buffer of standing-angle frames so the counter can commit the
+  *last* up-transition before the clip ends. Real recordings have
+  this trailing time naturally.
 - After #11 (depth gate): `partial` expected to drop to 0, leaving
   the whole set green.
 
@@ -51,6 +56,10 @@ angle, so we don't need realistic body coordinates.
 - **jitter** — fast 170° → 60° → 170° in 200ms cycles. Deep enough to
   pass any depth gate but too fast for hysteresis (~150ms dwell) or
   for a 0.8s min-duration filter.
+
+Every clip gets a 15-frame (~0.5s) trailing buffer of holding at 170°
+so the rep counter (with hysteresis) can commit the last up-transition
+before the clip ends.
 
 ## Regenerating
 
