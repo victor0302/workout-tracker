@@ -37,7 +37,13 @@ Scaffold is done; everything below is the actual work.
   closed via PRs #15–#19.
 - **Phase 1 — Rep counting that works.** Squats only. Replace the
   threshold hack with a real counter: smoothing, hysteresis, depth
-  gate, regression set. **In progress — 4/9 merged (latest 2026-06-07).**
+  gate, regression set. **In progress — 4/9 merged, #10 in flight
+  (PR #28).**
+- **Phase 1.5 — Rep-counter extensions.** Per-rep metrics
+  (depth, tempo, asymmetry), calibration, multi-exercise support,
+  real-clip regression set, replay viewer, A/B tuning harness, set
+  boundaries. 10 tickets (#29–#38) opened 2026-06-08. Not required to
+  ship Phase 1; valuable for Phase 4 analytics and longer-term use.
 - **Phase 2 — Wearable: real HR flowing.** Flash the ESP32, validate
   MAX30102 readings against a reference, fill in the SpO2 algorithm
   that's stubbed in the sketch.
@@ -86,23 +92,36 @@ Phases 1 and 2 are independent and can run in parallel.
     wired into `main.py` and `replay.py`. Side effect: smoothing
     alone dropped `jitter_0reps` from 14 → 0. Only `partial_0reps`
     still fails the counter (3 vs expected 0).
-  - 5 tickets remaining: `#10` hysteresis → `#11` depth gate →
-    `#12` min-duration → `#13` debug overlay → `#14` regression test.
-    **Architecture split:** `#10/#11/#12` extend `RepCounter` (they
-    change *when* state transitions happen); they do **not** belong
-    in `signal.py`. Earlier docs claimed otherwise — corrected here
-    and in `decisions.md`.
+  - `#10` hysteresis (PR #28, **in flight**). Extends `RepCounter`
+    with `dwell_frames=5` — state machine only commits a transition
+    after N consecutive frames past the threshold. Required a
+    generator change: every synthetic clip now has a 15-frame
+    trailing buffer of standing pose so the last up-transition can
+    commit before EOF (real recordings have this naturally).
+    Regression counts unchanged across all clips.
+  - 4 tickets remaining: `#11` depth gate → `#12` min-duration →
+    `#13` debug overlay → `#14` regression test. `#11–#12` extend
+    `RepCounter` (state machine); `#13` is UX in `main.py`;
+    `#14` is validation in `tests/`.
+- **Phase 1.5 — 10 tickets opened 2026-06-08** (#29–#38). Extensions
+  that make rep counting *better* — per-rep depth/timing/asymmetry,
+  calibration, multi-exercise, real-clip regression set, replay
+  viewer, A/B harness, set boundaries. Not required to close Phase 1
+  but valuable for the Phase 4 dashboard and real-world use. One
+  dependency flagged: #38 (set boundaries) needs #31 (timestamp-aware
+  `RepCounter.update`).
 - Phases 2–6 are not broken into tickets yet — do that when you get
   there.
 - See `decisions.md` for design and process decisions (squash-merge
   default, no Co-Authored-By, branch naming, synthetic-first
   regression data, dep-free format module, signal-vs-pose separation,
-  skip-on-None contract, etc.).
-- Next action: start Phase 1 (5/9) — hysteresis (`#10`). Extends
-  `RepCounter` (state machine), not `signal.py`. Add a "candidate"
-  state and require N consecutive frames past the threshold before
-  committing the transition. Must keep all currently-passing
-  regression clips passing.
+  skip-on-None contract, trailing-buffer in synthetic clips, Phase
+  1.5 as an extensions batch, etc.).
+- Next action: merge PR #28 (hysteresis), then start Phase 1 (6/9)
+  — depth gate (`#11`). Extends `RepCounter` with min-angle tracking
+  in the down phase; only commit a rep on up-transition if min depth
+  reached the gate (e.g. < 80°). Drives `partial_0reps` from 3 → 0
+  and closes the regression set.
 
 ## Open questions
 
