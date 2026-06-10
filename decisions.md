@@ -3,6 +3,58 @@
 Running log of design and process decisions that aren't obvious from
 code or git history. Newest at the top.
 
+## 2026-06-08 — Phase 1.5 is a distinct batch for rep-counter extensions
+
+Phase 1 (`#6`–`#14`) ships "rep counting that works." A second batch
+of 10 tickets (`#29`–`#38`, titled `Phase 1.5 (n/10): ...`) extends
+the same problem space — per-rep depth/tempo/asymmetry, calibration,
+multi-exercise support, real-clip regression set, replay viewer, A/B
+harness, set boundaries.
+
+**Why a separate label, not just continuing the Phase 1 numbering.**
+Original Phase 1 has a clear closure condition: when `#14` lands and
+the regression set goes green, rep counting is "done" in the sense of
+the original ticket. Phase 1.5 work makes it *better* (more metrics,
+calibrated thresholds, multi-exercise) but isn't required to close
+that phase. Keeping them in a separate batch lets Phase 1 end cleanly
+on `#14` without an implicit "but we still have nine more rep-counter
+PRs to ship" overhang. It also lets the user prioritize: skip the
+1.5 batch entirely if they want to jump to Phase 2/3/4 first.
+
+**Carry forward.**
+- Branch names: `phase1.5/NN-slug`. Numeric prefix sorts in ticket
+  order within the batch.
+- The same "extends, doesn't replace" pattern is available for any
+  future phase that needs follow-on work without inflating the
+  original scope. Call it `Phase N.5` and link from `notes.md`.
+- Don't mix Phase 1 and Phase 1.5 work in one PR.
+
+## 2026-06-08 — Synthetic regression clips need a trailing buffer
+
+Every clip in `regression_set/` ends with ~0.5s (15 frames) of
+holding at standing-pose angle (170°).
+
+**Why.** Sanity-checking `#10` (hysteresis, dwell=5) revealed every
+counted clip lost its last rep — the clip ended mid-up-transition,
+with only ~3 frames above 160° before EOF, but dwell=5 needs five
+consecutive frames past the threshold to commit. Real recordings
+have post-rep trailing time naturally (the person stays in frame
+after the last rep); the synthesis needed to mirror that.
+
+The fix lives in `scripts/gen_synthetic_clips.py` as
+`_with_trailing_buffer(records, frames=15, angle=170°)` applied to
+every clip in `CLIPS`.
+
+**Carry forward.**
+- Any new synthetic clip applies `_with_trailing_buffer` before
+  writing.
+- When adding a new state-machine filter that needs longer post-event
+  evidence (`#12` min-duration, future longer dwell tunings), check
+  the trailing buffer is still long enough. Extend the helper's
+  default rather than tweaking individual clips.
+- Real-clip captures (Phase 1.5 (1/10), `#29`) should include a few
+  seconds of standing time at the end, same reason.
+
 ## 2026-06-07 — Three-way split: inference / signal / state machine
 
 `vision/pose_estimator.py` is strictly a MediaPipe wrapper — inference
