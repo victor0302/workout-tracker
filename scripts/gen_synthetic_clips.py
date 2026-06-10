@@ -114,14 +114,35 @@ def jitter(n_cycles: int = 15, samples_per_cycle: int = 6) -> list[dict]:
     ]
 
 
+def _with_trailing_buffer(
+    records: list[dict],
+    frames: int = 15,
+    angle_deg: float = 170.0,
+) -> list[dict]:
+    """Append `frames` frames of holding at `angle_deg` after the clip.
+
+    Real recordings have post-rep frames where the person stays in frame;
+    without that tail the rep counter's hysteresis can't commit the last
+    up-transition before the clip ends, eating one rep off the count.
+    """
+    last_ts = records[-1]["ts"] if records else 0.0
+    return records + [
+        build_record(
+            ts=last_ts + i / FPS,
+            keypoints=keypoints_for_angle(angle_deg),
+        )
+        for i in range(1, frames + 1)
+    ]
+
+
 CLIPS = [
-    ("clean_5reps.jsonl", lambda: clean_reps(5)),
-    ("clean_8reps.jsonl", lambda: clean_reps(8)),
-    ("clean_10reps.jsonl", lambda: clean_reps(10)),
-    ("noisy_5reps.jsonl", lambda: noisy_reps(5)),
-    ("standing_0reps.jsonl", lambda: standing_still(5.0)),
-    ("partial_0reps.jsonl", lambda: partial_reps(3)),
-    ("jitter_0reps.jsonl", lambda: jitter(15)),
+    ("clean_5reps.jsonl", lambda: _with_trailing_buffer(clean_reps(5))),
+    ("clean_8reps.jsonl", lambda: _with_trailing_buffer(clean_reps(8))),
+    ("clean_10reps.jsonl", lambda: _with_trailing_buffer(clean_reps(10))),
+    ("noisy_5reps.jsonl", lambda: _with_trailing_buffer(noisy_reps(5))),
+    ("standing_0reps.jsonl", lambda: _with_trailing_buffer(standing_still(5.0))),
+    ("partial_0reps.jsonl", lambda: _with_trailing_buffer(partial_reps(3))),
+    ("jitter_0reps.jsonl", lambda: _with_trailing_buffer(jitter(15))),
 ]
 
 
