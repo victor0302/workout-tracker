@@ -73,15 +73,15 @@ BLE UUIDs in `firmware/esp32_max30102/esp32_max30102.ino` and
 ## Status
 
 - Scaffold and **Phase 0 complete** (2026-06-04).
-- **Phase 1 in flight** — 4/9 merged on main, `#10` open in PR #28:
+- **Phase 1 in flight** — 5/9 merged on main (latest 2026-06-10):
   - `#6` (PR #21) — record-and-replay harness
   - `#7` (PR #22) — synthetic regression set
   - `#8` (PR #24) — averaged knee angle in `vision/signal.py`
   - `#9` (PR #26) — EMA + median smoothing (`Smoother` Protocol);
     side effect: `jitter_0reps` dropped 14 → 0
-  - `#10` (PR #28, **in flight**) — hysteresis on `RepCounter`,
-    `dwell_frames=5`. Required adding a 15-frame trailing buffer to
-    every synthetic clip; counts unchanged after that.
+  - `#10` (PR #28) — hysteresis on `RepCounter`, `dwell_frames=5`.
+    Required a 15-frame trailing buffer on every synthetic clip;
+    counts unchanged after that.
 - Remaining Phase 1: `#11` depth gate → `#12` min-duration →
   `#13` debug overlay → `#14` regression test.
 - Only `partial_0reps` still fails the counter (3 vs expected 0).
@@ -90,6 +90,10 @@ BLE UUIDs in `firmware/esp32_max30102/esp32_max30102.ino` and
   Per-rep depth/tempo/asymmetry, calibration, multi-exercise, replay
   viewer, A/B harness, set boundaries, real-clip regression set. Not
   required to close Phase 1 — see `decisions.md` for the rationale.
+- **Phase 1 Hardening** — 6 tickets opened 2026-06-12 (`#40`–`#45`).
+  CI, ruff, mypy, pinned deps, NaN/Inf guards, JSONL versioning.
+  Merge `#40` (CI) first; the rest can interleave with Phase 1 work.
+  Dashboard auth/CORS deferred to Phase 4.
 - Phases 2–6 are described in `notes.md` but not yet broken into
   tickets.
 
@@ -103,7 +107,7 @@ The foundation is now on main:
 - `vision/rep_counter.py` handles state-machine behavior over a stream
   of samples
 
-The remaining work (`#10`–`#14`) tunes the rep counter against the
+The remaining work (`#11`–`#14`) tunes the rep counter against the
 regression set. **Don't tune thresholds in isolation.** Every change
 to `vision/signal.py` or `vision/rep_counter.py` should be validated
 by replaying the regression set. If you find yourself adjusting
@@ -115,7 +119,7 @@ regression test in `#14` will formalize this.
 - `#11` depth gate, `#12` min-duration → extend `RepCounter`. They
   change *when* the counter transitions given a stream of samples —
   that's state-machine behavior, not signal transformation. `#10`
-  (hysteresis) is the template; PR #28 has the pattern.
+  (hysteresis, on main) is the template.
 - `#13` debug overlay → `main.py` (UX only).
 - `#14` regression test → `tests/`.
 
@@ -126,9 +130,13 @@ that (`#12`'s min-duration with default 0.8s = 24 frames might be one
 example), extend `_with_trailing_buffer`'s default in
 `scripts/gen_synthetic_clips.py` and regenerate.
 
-**Phase 1.5 batch.** Don't mix Phase 1 and Phase 1.5 work in the same
-PR — the batches have different closure conditions and Phase 1.5 can
-be skipped entirely if priorities shift to Phase 2/3/4.
+**Three batches, don't mix them in one PR.**
+- *Phase 1* (`#11`–`#14`) — closes "rep counting that works."
+- *Phase 1.5* (`#29`–`#38`) — feature extensions. Skippable if
+  priorities shift to Phase 2/3/4. Branch: `phase1.5/NN-slug`.
+- *Phase 1 Hardening* (`#40`–`#45`) — engineering rigor (CI, lint,
+  types, deps, validation, format versioning). Land `#40` first to
+  enforce the rest in CI. Branch: `phase1-hardening/NN-slug`.
 
 Per-sample filters (the kind `signal.py` houses) implement the
 `Smoother` Protocol: `update(x: float | None) -> float | None` plus

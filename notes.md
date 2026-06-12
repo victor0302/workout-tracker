@@ -37,13 +37,20 @@ Scaffold is done; everything below is the actual work.
   closed via PRs #15–#19.
 - **Phase 1 — Rep counting that works.** Squats only. Replace the
   threshold hack with a real counter: smoothing, hysteresis, depth
-  gate, regression set. **In progress — 4/9 merged, #10 in flight
-  (PR #28).**
+  gate, regression set. **In progress — 5/9 merged (latest 2026-06-10).**
 - **Phase 1.5 — Rep-counter extensions.** Per-rep metrics
   (depth, tempo, asymmetry), calibration, multi-exercise support,
   real-clip regression set, replay viewer, A/B tuning harness, set
   boundaries. 10 tickets (#29–#38) opened 2026-06-08. Not required to
   ship Phase 1; valuable for Phase 4 analytics and longer-term use.
+- **Phase 1 Hardening — Engineering rigor.** CI, lint, type checking,
+  pinned deps, input validation, JSONL format versioning. 6 tickets
+  (#40–#45) opened 2026-06-12 after an audit of the Phase 1 codebase
+  found no automated test runs, no static analysis, all deps on
+  unbounded `>=` ranges, no NaN/Inf guards on the counter/smoother
+  inputs, and no version field in the JSONL clip format. The audit
+  also flagged dashboard auth/CORS as missing — that's deferred to
+  Phase 4 (dashboard work).
 - **Phase 2 — Wearable: real HR flowing.** Flash the ESP32, validate
   MAX30102 readings against a reference, fill in the SpO2 algorithm
   that's stubbed in the sketch.
@@ -76,7 +83,7 @@ Phases 1 and 2 are independent and can run in parallel.
 - **Phase 0 complete.** Tickets #1–#5 closed via PRs #15–#19,
   squash-merged to main on 2026-06-04. Acceptance criteria live as
   pytest tests under `tests/`.
-- **Phase 1 in flight (4/9).** Merged so far:
+- **Phase 1 in flight (5/9).** Merged so far:
   - `#6` — record-and-replay harness (PR #21, 2026-06-06).
     `vision/replay.py` runs a JSONL clip through the rep counter
     headless.
@@ -92,7 +99,7 @@ Phases 1 and 2 are independent and can run in parallel.
     wired into `main.py` and `replay.py`. Side effect: smoothing
     alone dropped `jitter_0reps` from 14 → 0. Only `partial_0reps`
     still fails the counter (3 vs expected 0).
-  - `#10` hysteresis (PR #28, **in flight**). Extends `RepCounter`
+  - `#10` hysteresis (PR #28, merged 2026-06-10). Extends `RepCounter`
     with `dwell_frames=5` — state machine only commits a transition
     after N consecutive frames past the threshold. Required a
     generator change: every synthetic clip now has a 15-frame
@@ -110,18 +117,26 @@ Phases 1 and 2 are independent and can run in parallel.
   but valuable for the Phase 4 dashboard and real-world use. One
   dependency flagged: #38 (set boundaries) needs #31 (timestamp-aware
   `RepCounter.update`).
+- **Phase 1 Hardening — 6 tickets opened 2026-06-12** (#40–#45).
+  CI (#40), ruff (#41), mypy (#42), pinned deps + Dependabot (#43),
+  NaN/Inf guards on counter+smoothers (#44), JSONL format version +
+  robust parse errors (#45). The audit also flagged dashboard
+  auth/CORS — deferred to Phase 4. Suggested merge order: #40 first
+  (unlocks #41/#42/#43 enforceability), then #41+#42, then #43, then
+  #44 and #45 in parallel.
 - Phases 2–6 are not broken into tickets yet — do that when you get
   there.
 - See `decisions.md` for design and process decisions (squash-merge
   default, no Co-Authored-By, branch naming, synthetic-first
   regression data, dep-free format module, signal-vs-pose separation,
   skip-on-None contract, trailing-buffer in synthetic clips, Phase
-  1.5 as an extensions batch, etc.).
-- Next action: merge PR #28 (hysteresis), then start Phase 1 (6/9)
-  — depth gate (`#11`). Extends `RepCounter` with min-angle tracking
-  in the down phase; only commit a rep on up-transition if min depth
-  reached the gate (e.g. < 80°). Drives `partial_0reps` from 3 → 0
-  and closes the regression set.
+  1.5 as an extensions batch, Phase 1 Hardening as a hygiene batch,
+  etc.).
+- Next action: start Phase 1 (6/9) — depth gate (`#11`). Extends
+  `RepCounter` with min-angle tracking in the down phase; only
+  commit a rep on up-transition if min depth reached the gate
+  (e.g. < 80°). Drives `partial_0reps` from 3 → 0 and closes the
+  regression set. Hardening tickets (#40+) can run in parallel.
 
 ## Open questions
 
