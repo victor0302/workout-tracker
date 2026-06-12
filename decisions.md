@@ -3,6 +3,43 @@
 Running log of design and process decisions that aren't obvious from
 code or git history. Newest at the top.
 
+## 2026-06-12 — Phase 1 Hardening is its own batch; auth/CORS deferred to Phase 4
+
+A health/security audit of the Phase 1 codebase produced six tickets
+(`#40`–`#45`, titled `Phase 1 Hardening (n/6): ...`) covering: GitHub
+Actions CI, ruff + pre-commit, mypy, pinned deps + Dependabot,
+NaN/Inf guards on `RepCounter`/`Smoother` inputs, JSONL clip format
+versioning + robust parse errors. The audit also flagged the dashboard
+having no auth and no CORS — anyone reachable on the port can POST to
+`/ingest/*` and read `/metrics`.
+
+**Why a separate batch from Phase 1.5.**
+1.5 is feature extensions to rep counting (per-rep metrics,
+calibration, multi-exercise). Hardening is engineering rigor
+(tooling, robustness, supply-chain). Different reviewers might pick
+them up; different urgency tradeoffs. Keeping them in separate
+labeled batches lets the user prioritize independently and merge them
+out of order without confusion about "which Phase 1 batch is this from?"
+
+**Why auth/CORS isn't in this batch.**
+The dashboard is the only component with that exposure, and the
+dashboard's full hardening (auth, CORS, rate limiting, input bounds
+on Pydantic models) is Phase 4 work. Pulling it into Phase 1
+Hardening would muddle the scope — Phase 1 Hardening's job is the
+vision-side codebase and the build/CI tooling that serves all phases.
+
+**Carry forward.**
+- Branch naming: `phase1-hardening/NN-slug` (analogous to
+  `phase1.5/NN-slug`). Don't mix Phase 1, Phase 1.5, and Hardening
+  work in one PR.
+- Suggested merge order: #40 (CI) first to unlock enforceability of
+  #41/#42/#43, then lint+types, then deps, then the code-side
+  hardening (#44, #45) in parallel.
+- Future audits of later phases follow the same pattern: open a
+  `Phase N Hardening` batch with whatever tickets the audit produces.
+- Dashboard auth/CORS captured as a Phase 4 must-do in `notes.md`;
+  ticket it when Phase 4 starts.
+
 ## 2026-06-08 — Phase 1.5 is a distinct batch for rep-counter extensions
 
 Phase 1 (`#6`–`#14`) ships "rep counting that works." A second batch
